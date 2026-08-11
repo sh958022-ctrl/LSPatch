@@ -18,7 +18,7 @@ plugins {
 
 android {
     defaultConfig {
-        applicationId = defaultManagerPackageName
+        applicationId = "org.lsposed.lspatch.canary"
     }
 
     androidResources {
