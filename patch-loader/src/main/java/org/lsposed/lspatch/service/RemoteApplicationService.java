@@ -32,7 +32,7 @@ import java.util.concurrent.TimeoutException;
 public class RemoteApplicationService implements ILSPApplicationService {
 
     private static final String TAG = "LSPatch";
-    private static final String MODULE_SERVICE = Constants.MANAGER_PACKAGE_NAME + ".manager.ModuleService";
+    private static final String MODULE_SERVICE = "org.lsposed.lspatch.manager.ModuleService";
 
     private volatile ILSPApplicationService service;
 
@@ -42,8 +42,10 @@ public class RemoteApplicationService implements ILSPApplicationService {
             var intent = new Intent()
                     .setComponent(new ComponentName(Constants.MANAGER_PACKAGE_NAME, MODULE_SERVICE))
                     .putExtra("packageName", context.getPackageName());
+
             // TODO: Authentication
             var latch = new CountDownLatch(1);
+
             var conn = new ServiceConnection() {
                 @Override
                 public void onServiceConnected(ComponentName name, IBinder binder) {
@@ -58,25 +60,65 @@ public class RemoteApplicationService implements ILSPApplicationService {
                     service = null;
                 }
             };
+
             Log.i(TAG, "Request manager binder");
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                context.bindService(intent, Context.BIND_AUTO_CREATE, Executors.newSingleThreadExecutor(), conn);
+                context.bindService(
+                        intent,
+                        Context.BIND_AUTO_CREATE,
+                        Executors.newSingleThreadExecutor(),
+                        conn
+                );
             } else {
                 var handlerThread = new HandlerThread("RemoteApplicationService");
                 handlerThread.start();
+
                 var handler = new Handler(handlerThread.getLooper());
                 var contextImplClass = context.getClass();
+
                 var getUserMethod = contextImplClass.getMethod("getUser");
+
                 var bindServiceAsUserMethod = contextImplClass.getDeclaredMethod(
-                        "bindServiceAsUser", Intent.class, ServiceConnection.class, int.class, Handler.class, UserHandle.class);
+                        "bindServiceAsUser",
+                        Intent.class,
+                        ServiceConnection.class,
+                        int.class,
+                        Handler.class,
+                        UserHandle.class
+                );
+
                 var userHandle = (UserHandle) getUserMethod.invoke(context);
-                bindServiceAsUserMethod.invoke(context, intent, conn, Context.BIND_AUTO_CREATE, handler, userHandle);
+
+                bindServiceAsUserMethod.invoke(
+                        context,
+                        intent,
+                        conn,
+                        Context.BIND_AUTO_CREATE,
+                        handler,
+                        userHandle
+                );
             }
+
             boolean success = latch.await(1, TimeUnit.SECONDS);
-            if (!success) throw new TimeoutException("Bind service timeout");
-        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException |
-                 InterruptedException | TimeoutException e) {
-            Toast.makeText(context, "Unable to connect to Manager", Toast.LENGTH_SHORT).show();
+
+            if (!success) {
+                throw new TimeoutException("Bind service timeout");
+            }
+
+        } catch (
+                NoSuchMethodException
+                        | IllegalAccessException
+                        | InvocationTargetException
+                        | InterruptedException
+                        | TimeoutException e
+        ) {
+            Toast.makeText(
+                    context,
+                    "Unable to connect to Manager",
+                    Toast.LENGTH_SHORT
+            ).show();
+
             var r = new RemoteException("Failed to get manager binder");
             r.initCause(e);
             throw r;
@@ -90,22 +132,31 @@ public class RemoteApplicationService implements ILSPApplicationService {
 
     @Override
     public List<Module> getLegacyModulesList() throws RemoteException {
-        return service == null ? new ArrayList<>() : service.getLegacyModulesList();
+        return service == null
+                ? new ArrayList<>()
+                : service.getLegacyModulesList();
     }
 
     @Override
     public List<Module> getModulesList() throws RemoteException {
-        return service == null ? new ArrayList<>() : service.getModulesList();
+        return service == null
+                ? new ArrayList<>()
+                : service.getModulesList();
     }
 
     @Override
     public String getPrefsPath(String packageName) {
-        return new File(Environment.getDataDirectory(), "data/" + packageName + "/shared_prefs/").getAbsolutePath();
+        return new File(
+                Environment.getDataDirectory(),
+                "data/" + packageName + "/shared_prefs/"
+        ).getAbsolutePath();
     }
 
     @Override
     public IBinder asBinder() {
-        return service == null ? null : service.asBinder();
+        return service == null
+                ? null
+                : service.asBinder();
     }
 
     @Override
